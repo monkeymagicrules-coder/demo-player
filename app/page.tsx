@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
 export default function Home() {
-  const wavesurferRef = useRef<WaveSurfer | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
+  // 初始化 WaveSurfer
   useEffect(() => {
     if (waveformRef.current && !wavesurferRef.current) {
       wavesurferRef.current = WaveSurfer.create({
@@ -18,39 +19,51 @@ export default function Home() {
         height: 80,
         normalize: true,
         cursorColor: '#FF0000',
-        responsive: true,
       });
 
+      // 音频加载完成事件
       wavesurferRef.current.on('ready', () => {
         setDuration(wavesurferRef.current!.getDuration());
       });
 
+      // 播放进度事件
       wavesurferRef.current.on('audioprocess', () => {
         setCurrentTime(wavesurferRef.current!.getCurrentTime());
       });
 
+      // 播放结束事件
       wavesurferRef.current.on('finish', () => {
         setIsPlaying(false);
         setCurrentTime(0);
       });
     }
+
+    return () => {
+      wavesurferRef.current?.destroy();
+    };
   }, []);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !wavesurferRef.current) return;
-    const objectUrl = URL.createObjectURL(file);
-    wavesurferRef.current.load(objectUrl);
-    setIsPlaying(false);
-    setCurrentTime(0);
+  // 选择文件
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        wavesurferRef.current?.loadBlob(file);
+        setIsPlaying(false);
+        setCurrentTime(0);
+      };
+      reader.readAsArrayBuffer(file);
+    }
   };
 
+  // 播放 / 暂停
   const togglePlay = () => {
-    if (!wavesurferRef.current) return;
-    wavesurferRef.current.playPause();
+    wavesurferRef.current?.playPause();
     setIsPlaying(!isPlaying);
   };
 
+  // 格式化时间
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
       .toString()
@@ -62,24 +75,34 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      {/* 保留你原来的文件选择逻辑 */}
+    <div style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
+      <h1>Demo 音乐播放器</h1>
+
+      {/* 选择文件 */}
       <input
         type="file"
         accept="audio/*"
         onChange={handleFileChange}
-        style={{ marginBottom: 20 }}
+        style={{ marginBottom: 10 }}
       />
 
-      {/* 波形 */}
-      <div ref={waveformRef} style={{ marginBottom: 10 }} />
+      {/* 波形图 */}
+      <div
+        ref={waveformRef}
+        style={{
+          width: '100%',
+          marginBottom: 10,
+          border: '1px solid #ccc',
+          borderRadius: 4,
+        }}
+      />
 
-      {/* 播放/暂停按钮 */}
+      {/* 播放 / 暂停按钮 */}
       <button onClick={togglePlay} style={{ marginRight: 10 }}>
-        {isPlaying ? '暂停 ⏸' : '播放 ▶️'}
+        {isPlaying ? '暂停' : '播放'}
       </button>
 
-      {/* 时间轴 */}
+      {/* 时间轴显示 */}
       <span>
         {formatTime(currentTime)} / {formatTime(duration)}
       </span>
