@@ -3,109 +3,95 @@
 import { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 
-export default function AudioPlayer() {
-  const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<WaveSurfer | null>(null);
+export default function Page() {
   const [file, setFile] = useState<File | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  useEffect(() => {
-    if (!waveformRef.current) return;
-
-    wavesurferRef.current = WaveSurfer.create({
-      container: waveformRef.current,
-      waveColor: "#a0a0a0",
-      progressColor: "#3B8686",
-      height: 80,
-      responsive: true, // WaveSurfer v6+ 有可能需要其他方式实现响应式
-    });
-
-    return () => wavesurferRef.current?.destroy();
-  }, []);
-
-  useEffect(() => {
-    if (file && wavesurferRef.current) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const arrayBuffer = e.target?.result;
-        if (arrayBuffer) {
-          wavesurferRef.current!.loadBlob(new Blob([arrayBuffer]));
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-  }, [file]);
+  const waveformRef = useRef<WaveSurfer | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (selected) {
-      setFile(selected);
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    setFile(selectedFile);
+
+    if (waveformRef.current) {
+      waveformRef.current.destroy();
+      waveformRef.current = null;
     }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const arrayBuffer = event.target?.result;
+      if (!arrayBuffer || !containerRef.current) return;
+
+      waveformRef.current = WaveSurfer.create({
+        container: containerRef.current,
+        waveColor: "#ddd",
+        progressColor: "#3B8686",
+        height: 80,
+      });
+
+      waveformRef.current.loadBlob(new Blob([arrayBuffer]));
+    };
+    reader.readAsArrayBuffer(selectedFile);
   };
 
-  const togglePlay = () => {
-    if (!wavesurferRef.current) return;
-    wavesurferRef.current.playPause();
-    setIsPlaying(!isPlaying);
-  };
+  useEffect(() => {
+    return () => {
+      if (waveformRef.current) {
+        waveformRef.current.destroy();
+        waveformRef.current = null;
+      }
+    };
+  }, []);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Audio Player Demo</h2>
+    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
+      <h1>Demo 音频播放器</h1>
 
-      <div
+      {/* 隐藏的 input，通过 label 点击触发，兼容 iOS */}
+      <input
+        id="audio-upload"
+        type="file"
+        accept="audio/*,audio/mpeg,audio/wav,audio/mp3"
+        onChange={handleFileChange}
+        style={{ display: "none" }}
+      />
+      <label
+        htmlFor="audio-upload"
         style={{
-          position: "relative",
-          width: "100%",
-          height: 50,
+          display: "block",
+          padding: 10,
           border: "1px solid #ccc",
           borderRadius: 4,
-          marginBottom: 10,
-        }}
-      >
-        <input
-          type="file"
-          accept="audio/*,.mp3,.wav"
-          onChange={handleFileChange}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            opacity: 0,
-            cursor: "pointer",
-          }}
-        />
-        <span
-          style={{
-            position: "absolute",
-            top: 12,
-            left: 10,
-            pointerEvents: "none",
-            color: "#666",
-          }}
-        >
-          {file ? file.name : "点击选择音频文件 (MP3/WAV)"}
-        </span>
-      </div>
-
-      <div ref={waveformRef}></div>
-
-      <button
-        onClick={togglePlay}
-        style={{
-          marginTop: 10,
-          padding: "6px 12px",
-          borderRadius: 4,
-          border: "none",
-          background: "#3B8686",
-          color: "#fff",
+          textAlign: "center",
           cursor: "pointer",
+          userSelect: "none",
+          marginBottom: 20,
         }}
       >
-        {isPlaying ? "暂停" : "播放"}
-      </button>
+        {file ? file.name : "点击选择音频文件 (MP3/WAV)"}
+      </label>
+
+      {/* 播放器容器 */}
+      <div ref={containerRef} style={{ width: "100%" }} />
+
+      {/* 播放/暂停按钮 */}
+      {file && waveformRef.current && (
+        <button
+          style={{
+            marginTop: 10,
+            padding: "8px 16px",
+            cursor: "pointer",
+            borderRadius: 4,
+            border: "1px solid #3B8686",
+            backgroundColor: "#fff",
+            color: "#3B8686",
+          }}
+          onClick={() => waveformRef.current?.isPlaying() ? waveformRef.current.pause() : waveformRef.current.play()}
+        >
+          {waveformRef.current.isPlaying() ? "暂停" : "播放"}
+        </button>
+      )}
     </div>
   );
 }
