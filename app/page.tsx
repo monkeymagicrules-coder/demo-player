@@ -1,79 +1,107 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
+import WaveSurfer from "wavesurfer.js";
 
-// 动态加载 WaveSurfer，避免 Next.js SSR 报错
-const WaveSurfer = dynamic(() => import("wavesurfer.js"), { ssr: false });
-
-export default function Home() {
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+export default function DemoPlayer() {
   const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<any>(null);
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
 
   // 初始化 WaveSurfer
   useEffect(() => {
-    if (waveformRef.current && !wavesurferRef.current) {
-      wavesurferRef.current = WaveSurfer.create({
-        container: waveformRef.current,
-        waveColor: "#d9dcff",
-        progressColor: "#3B8686",
-        height: 80,
-        barWidth: 2,
-        cursorWidth: 1,
-      });
-    }
+    if (!waveformRef.current) return;
+
+    wavesurferRef.current = WaveSurfer.create({
+      container: waveformRef.current,
+      waveColor: "#A8DBA8",
+      progressColor: "#3B8686",
+      height: 80,
+    });
+
+    return () => {
+      wavesurferRef.current?.destroy();
+    };
   }, []);
 
-  // 加载音频
-  useEffect(() => {
-    if (audioFile && wavesurferRef.current) {
-      const url = URL.createObjectURL(audioFile);
-      wavesurferRef.current.load(url);
-    }
-  }, [audioFile]);
-
-  // 处理文件选择
+  // 文件选择后加载音频
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setAudioFile(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    setCurrentFile(file);
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      const result = event.target?.result;
+      if (typeof result === "string" || result instanceof ArrayBuffer) {
+        wavesurferRef.current?.loadBlob(file);
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
-  // iOS 点击按钮触发文件选择
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const handleSelectFile = () => {
+  const triggerFileSelect = () => {
     fileInputRef.current?.click();
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "600px", margin: "auto" }}>
-      <h1>兼容 iOS 的播放器</h1>
+    <div style={{ padding: 20 }}>
+      <h2>Demo 音乐播放器</h2>
+
+      {/* 按钮触发文件选择 */}
       <button
-        onClick={handleSelectFile}
+        onClick={triggerFileSelect}
         style={{
           padding: "10px 20px",
-          background: "#3B8686",
+          backgroundColor: "#3B8686",
           color: "#fff",
           border: "none",
-          borderRadius: "5px",
-          marginBottom: "20px",
+          borderRadius: 6,
+          cursor: "pointer",
+          marginBottom: 20,
         }}
       >
         选择音频文件
       </button>
+
+      {/* 隐藏 input */}
       <input
-        type="file"
         ref={fileInputRef}
-        accept="audio/*"
-        style={{ display: "none" }}
+        type="file"
+        accept="audio/*" // ✅ iOS 兼容
         onChange={handleFileChange}
+        style={{ display: "none" }}
       />
-      <div ref={waveformRef}></div>
-      {audioFile && (
-        <p>
-          当前文件: <strong>{audioFile.name}</strong>
-        </p>
+
+      {/* WaveSurfer 容器 */}
+      <div ref={waveformRef} style={{ width: "100%", marginTop: 20 }} />
+
+      {currentFile && (
+        <div style={{ marginTop: 10 }}>
+          <strong>当前文件:</strong> {currentFile.name}
+        </div>
       )}
+
+      {/* 播放 / 暂停 控制 */}
+      <div style={{ marginTop: 20 }}>
+        <button
+          onClick={() => wavesurferRef.current?.playPause()}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#FF6B6B",
+            color: "#fff",
+            border: "none",
+            borderRadius: 4,
+            cursor: "pointer",
+          }}
+        >
+          播放 / 暂停
+        </button>
+      </div>
     </div>
   );
 }
