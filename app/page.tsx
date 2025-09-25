@@ -42,11 +42,14 @@ export default function Home() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // 保证 iOS Safari 可读取文件
       const reader = new FileReader();
       reader.onload = () => {
-        wavesurferRef.current?.loadBlob(file);
-        setIsPlaying(false);
-        setCurrentTime(0);
+        if (reader.result instanceof ArrayBuffer) {
+          wavesurferRef.current?.loadBlob(file);
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }
       };
       reader.readAsArrayBuffer(file);
     }
@@ -71,6 +74,7 @@ export default function Home() {
     <div style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
       <h1>Demo 音乐播放器</h1>
 
+      {/* iOS / 浏览器兼容文件选择 */}
       <input
         type="file"
         accept="audio/*"
