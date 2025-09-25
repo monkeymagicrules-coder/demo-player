@@ -1,97 +1,88 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import WaveSurfer from "wavesurfer.js";
+import { useEffect, useRef, useState } from 'react';
+import WaveSurfer from 'wavesurfer.js';
 
-export default function Page() {
-  const [file, setFile] = useState<File | null>(null);
-  const waveformRef = useRef<WaveSurfer | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    setFile(selectedFile);
-
-    if (waveformRef.current) {
-      waveformRef.current.destroy();
-      waveformRef.current = null;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const arrayBuffer = event.target?.result;
-      if (!arrayBuffer || !containerRef.current) return;
-
-      waveformRef.current = WaveSurfer.create({
-        container: containerRef.current,
-        waveColor: "#ddd",
-        progressColor: "#3B8686",
-        height: 80,
-      });
-
-      waveformRef.current.loadBlob(new Blob([arrayBuffer]));
-    };
-    reader.readAsArrayBuffer(selectedFile);
-  };
+export default function Home() {
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const waveformRef = useRef<HTMLDivElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   useEffect(() => {
-    return () => {
-      if (waveformRef.current) {
-        waveformRef.current.destroy();
-        waveformRef.current = null;
-      }
-    };
+    if (waveformRef.current && !wavesurferRef.current) {
+      wavesurferRef.current = WaveSurfer.create({
+        container: waveformRef.current,
+        progressColor: '#3B8686',
+        height: 80,
+        normalize: true,
+        cursorColor: '#FF0000',
+        responsive: true,
+      });
+
+      wavesurferRef.current.on('ready', () => {
+        setDuration(wavesurferRef.current!.getDuration());
+      });
+
+      wavesurferRef.current.on('audioprocess', () => {
+        setCurrentTime(wavesurferRef.current!.getCurrentTime());
+      });
+
+      wavesurferRef.current.on('finish', () => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      });
+    }
   }, []);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !wavesurferRef.current) return;
+    const objectUrl = URL.createObjectURL(file);
+    wavesurferRef.current.load(objectUrl);
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const togglePlay = () => {
+    if (!wavesurferRef.current) return;
+    wavesurferRef.current.playPause();
+    setIsPlaying(!isPlaying);
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, '0');
+    const s = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   return (
-    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-      <h1>Demo 音频播放器</h1>
-
-      {/* 隐藏的 input，通过 label 点击触发，兼容 iOS */}
+    <div style={{ padding: 20 }}>
+      {/* 保留你原来的文件选择逻辑 */}
       <input
-        id="audio-upload"
         type="file"
-        accept="audio/*,audio/mpeg,audio/wav,audio/mp3"
+        accept="audio/*"
         onChange={handleFileChange}
-        style={{ display: "none" }}
+        style={{ marginBottom: 20 }}
       />
-      <label
-        htmlFor="audio-upload"
-        style={{
-          display: "block",
-          padding: 10,
-          border: "1px solid #ccc",
-          borderRadius: 4,
-          textAlign: "center",
-          cursor: "pointer",
-          userSelect: "none",
-          marginBottom: 20,
-        }}
-      >
-        {file ? file.name : "点击选择音频文件 (MP3/WAV)"}
-      </label>
 
-      {/* 播放器容器 */}
-      <div ref={containerRef} style={{ width: "100%" }} />
+      {/* 波形 */}
+      <div ref={waveformRef} style={{ marginBottom: 10 }} />
 
       {/* 播放/暂停按钮 */}
-      {file && waveformRef.current && (
-        <button
-          style={{
-            marginTop: 10,
-            padding: "8px 16px",
-            cursor: "pointer",
-            borderRadius: 4,
-            border: "1px solid #3B8686",
-            backgroundColor: "#fff",
-            color: "#3B8686",
-          }}
-          onClick={() => waveformRef.current?.isPlaying() ? waveformRef.current.pause() : waveformRef.current.play()}
-        >
-          {waveformRef.current.isPlaying() ? "暂停" : "播放"}
-        </button>
-      )}
+      <button onClick={togglePlay} style={{ marginRight: 10 }}>
+        {isPlaying ? '暂停 ⏸' : '播放 ▶️'}
+      </button>
+
+      {/* 时间轴 */}
+      <span>
+        {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
     </div>
   );
 }
