@@ -1,68 +1,79 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import WaveSurfer from 'wavesurfer.js';
+import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
+
+// 动态加载 WaveSurfer，避免 Next.js SSR 报错
+const WaveSurfer = dynamic(() => import("wavesurfer.js"), { ssr: false });
 
 export default function Home() {
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<WaveSurfer | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const wavesurferRef = useRef<any>(null);
 
+  // 初始化 WaveSurfer
   useEffect(() => {
     if (waveformRef.current && !wavesurferRef.current) {
       wavesurferRef.current = WaveSurfer.create({
         container: waveformRef.current,
-        waveColor: '#A8DBA8',
-        progressColor: '#3B8686',
+        waveColor: "#d9dcff",
+        progressColor: "#3B8686",
         height: 80,
+        barWidth: 2,
+        cursorWidth: 1,
       });
-
-      // 自适应容器宽度
-      const resizeHandler = () => {
-        if (wavesurferRef.current) {
-          wavesurferRef.current.drawer.containerWidth = waveformRef.current!.clientWidth;
-          wavesurferRef.current.drawBuffer();
-        }
-      };
-      window.addEventListener('resize', resizeHandler);
-      resizeHandler(); // 初始化
-
-      return () => {
-        window.removeEventListener('resize', resizeHandler);
-        wavesurferRef.current?.destroy();
-      };
     }
   }, []);
 
+  // 加载音频
+  useEffect(() => {
+    if (audioFile && wavesurferRef.current) {
+      const url = URL.createObjectURL(audioFile);
+      wavesurferRef.current.load(url);
+    }
+  }, [audioFile]);
+
   // 处理文件选择
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    setFile(selectedFile);
+    const file = e.target.files?.[0];
+    if (file) setAudioFile(file);
+  };
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (wavesurferRef.current && ev.target?.result) {
-        wavesurferRef.current.loadBlob(new Blob([ev.target.result]));
-      }
-    };
-    reader.readAsArrayBuffer(selectedFile);
+  // iOS 点击按钮触发文件选择
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleSelectFile = () => {
+    fileInputRef.current?.click();
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ padding: "20px", maxWidth: "600px", margin: "auto" }}>
+      <h1>兼容 iOS 的播放器</h1>
+      <button
+        onClick={handleSelectFile}
+        style={{
+          padding: "10px 20px",
+          background: "#3B8686",
+          color: "#fff",
+          border: "none",
+          borderRadius: "5px",
+          marginBottom: "20px",
+        }}
+      >
+        选择音频文件
+      </button>
       <input
         type="file"
-        accept=".mp3, .wav"
+        ref={fileInputRef}
+        accept="audio/*"
+        style={{ display: "none" }}
         onChange={handleFileChange}
-        style={{ marginBottom: '10px' }}
       />
-      <div
-        id="waveform"
-        ref={waveformRef}
-        style={{ width: '100%', border: '1px solid #ccc' }}
-      />
-      {file && <p>正在播放: {file.name}</p>}
+      <div ref={waveformRef}></div>
+      {audioFile && (
+        <p>
+          当前文件: <strong>{audioFile.name}</strong>
+        </p>
+      )}
     </div>
   );
 }
