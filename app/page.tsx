@@ -1,12 +1,12 @@
-'use client'; // ⚠️ 记得这一行，确保 React Hooks 可以在客户端使用
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
-export default function HomePage() {
+export default function Home() {
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
-  const [fileName, setFileName] = useState<string>('');
+  const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (waveformRef.current && !wavesurferRef.current) {
@@ -15,53 +15,54 @@ export default function HomePage() {
         waveColor: '#A8DBA8',
         progressColor: '#3B8686',
         height: 80,
-        responsive: true,
       });
-    }
 
-    return () => {
-      wavesurferRef.current?.destroy();
-      wavesurferRef.current = null;
-    };
+      // 自适应容器宽度
+      const resizeHandler = () => {
+        if (wavesurferRef.current) {
+          wavesurferRef.current.drawer.containerWidth = waveformRef.current!.clientWidth;
+          wavesurferRef.current.drawBuffer();
+        }
+      };
+      window.addEventListener('resize', resizeHandler);
+      resizeHandler(); // 初始化
+
+      return () => {
+        window.removeEventListener('resize', resizeHandler);
+        wavesurferRef.current?.destroy();
+      };
+    }
   }, []);
 
+  // 处理文件选择
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setFileName(file.name);
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    setFile(selectedFile);
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const arrayBuffer = event.target?.result;
-      if (arrayBuffer && wavesurferRef.current) {
-        wavesurferRef.current.loadBlob(new Blob([arrayBuffer]));
+    reader.onload = (ev) => {
+      if (wavesurferRef.current && ev.target?.result) {
+        wavesurferRef.current.loadBlob(new Blob([ev.target.result]));
       }
     };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const togglePlay = () => {
-    wavesurferRef.current?.playPause();
+    reader.readAsArrayBuffer(selectedFile);
   };
 
   return (
-    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
-      <h1>本地音频播放器</h1>
-
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
       <input
         type="file"
-        accept="audio/*"
+        accept=".mp3, .wav"
         onChange={handleFileChange}
-        style={{ marginBottom: 10 }}
+        style={{ marginBottom: '10px' }}
       />
-      {fileName && <p>当前文件: {fileName}</p>}
-
-      <div ref={waveformRef} style={{ marginBottom: 10 }} />
-
-      <button onClick={togglePlay} style={{ padding: '6px 12px' }}>
-        播放 / 暂停
-      </button>
+      <div
+        id="waveform"
+        ref={waveformRef}
+        style={{ width: '100%', border: '1px solid #ccc' }}
+      />
+      {file && <p>正在播放: {file.name}</p>}
     </div>
   );
 }
